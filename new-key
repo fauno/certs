@@ -23,24 +23,26 @@ for _host in $@; do
     continue
   fi
 
+# certtool also takes care of file permissions :O
+# Just in case default config is stupid we use rsa
+# Also be a little paranoid (we could use "ultra")
   printf "Generating %s\n" "${_key}"
   certtool --generate-privkey \
-# certtool also takes care of file permissions :O
            --outfile="${_key}" \
-# Just in case default config is stupid
            --rsa \
-# Be a little paranoid (we could use "ultra")
-           --sec-param=high
+           --sec-param high
 done
 
 _dh=/etc/ssl/private/2048.dh
-printf "\nGenerating Diffie-Helman params at %s...\n" "${_dh}"
-certtool --generate-dh-params \
-         --outfile "${_dh}" \
-         --bits 2048
+if test ! -f "${_dh}" ; then
+  printf "\nGenerating Diffie-Helman params at %s...\n" "${_dh}"
+  certtool --generate-dh-params \
+          --outfile "${_dh}" \
+          --bits 2048
+fi
 
 # Create a "keys" group
-getent group keys || groupadd --system keys
+getent group keys &>/dev/null || groupadd --system keys
 # And make it the group of private/ so we can give access to specific
 # users
 chown -R root:keys /etc/ssl/private/

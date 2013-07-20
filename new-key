@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Generate private keys for your domains
+set -e
+
+if test -z "$1" ; then
+  printf "Usage: %s [--one-key] example.org [x.example.org...]\n" "${0%%*/}"
+  exit
+fi
+
+# If we want to have a single key for every cert
+# Meanwhile, hellekin convinced me it's not a good idea to reuse keys
+test "$1" = "--one-key" && ONE_KEY=true && shift
+
+command -v haveged &>/dev/null || \
+printf "Running a daemon called haveged could really help ;)\n"
+
+for _host in $@; do
+# The files!
+  _key="/etc/ssl/private/${_host}.key"
+
+  if test -f "${_key}" ; then
+    printf "Key %s already exists, skipping\n" "${_key}"
+    continue
+  fi
+
+  printf "Generating %s\n" "${_key}"
+  certtool --generate-privkey \
+# certtool also takes care of file permissions :O
+           --outfile="${_key}" \
+# Just in case default config is stupid
+           --rsa \
+# Be a little paranoid (we could use "ultra")
+           --sec-param=high
+done
+
+_dh=/etc/ssl/private/2048.dh
+printf "\nGenerating Diffie-Helman params at %s...\n" "${_dh}"
+certtool --generate-dh-params \
+         --outfile "${_dh}" \
+         --bits 2048
+
+# Create a "keys" group
+getent group keys || groupadd --system keys
+# And make it the group of private/ so we can give access to specific
+# users
+chown -R root:keys /etc/ssl/private/
+# Setgid private/ so new files belong to keys
+chmod g+s /etc/ssl/private/
+# Make it executable to keys
+chmod 710 /etc/ssl/private/
+# Make all files readable to keys
+chmod 640 /etc/ssl/private/*
+
+printf "Keys were generated for your domains.  Also, if this wasn't
+enough, a 'keys' group was created to give access to the private keys.
+If you want a service running on it's own user you have to give access
+to them, so add it to the group: \`gpasswd -a postfix keys\` (be aware
+you should pick these users carefully)\n" | fmt -w $(tput cols)

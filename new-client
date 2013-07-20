@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Generate Client Certificate Signing Requests from our domain keys
+# It assumes you store all your keys under the format example.org.key on
+# /etc/ssl/private
+set -e
+
+# Print usage
+if test -z "$1" ; then
+  printf "Usage: %s example.org [example.com...]\n" "${0##*/}"
+  exit
+fi
+
+# For each hostname passed
+for _host in $@; do
+# The files!
+  _key="/etc/ssl/private/${_host}.key"
+  _csr="/etc/ssl/private/root@${_host}.csr"
+  _crt="/etc/ssl/private/root@${_host}.crt"
+
+# Test if we have something like that and inform
+  if test ! -r "${_key}"; then
+    printf "Key for %s doesn't exist or you don't have enough
+privileges, skipped\n" "${_host}" | fmt -w $(tput cols)
+    continue
+  fi
+
+# TODO this stops asking for a password and shows a lot of gibberish
+# maybe we should use a bogus template (see certtool(1)), since cacert
+# only cares about the CN
+  yes "" | \
+# Generate a request and save it as root@example.org.csr using the
+# matching key.
+  certtool --generate-request \
+           --load-privkey="${_key}" \
+           --outfile="${_csr}"
+
+  printf "\n\n%s created\n" "${_csr}"
+  crts="${crts} ${_crt}"
+done
+
+# Give some instructions
+printf "\nUse these files to generate client certificates
+at CACert.org and save them as:\n" | fmt -w $(tput cols)
+
+echo "${crts}" | tr " " "\n"

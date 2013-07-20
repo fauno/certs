@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -e
+
+_exit() { rm cookies; }
+
+trap _exit EXIT TERM QUIT INT KILL
+
+# Print usage
+if test -z "$1" ; then
+  printf "Usage: %s example.org [example.com...]\n" "${0##*/}"
+  exit
+fi
+
+# For each hostname passed
+for _host in $@; do
+# The files!
+  _key="/etc/ssl/private/${_host}.key"
+  _csr="/etc/ssl/private/${_host}.csr"
+  _crt="/etc/ssl/certs/${_host}.crt"
+  _ccrt="/etc/ssl/private/root@${_host}.crt"
+
+# Test if we have something like that and inform
+  if test ! -r "${_key}"; then
+    printf "Key for %s doesn't exist or you don't have enough
+privileges, skipped\n" "${_host}" | fmt -w $(tput cols)
+    continue
+  fi
+
+  if test ! -f "${_ccrt}" ; then
+    printf "You don't have a client certificate to login into CACert.
+Please generate one with \`new-client\`" | fmt -w $(tput cols)
+
+# Generate a request and save it as root@example.org.csr using the
+# matching key.
+  test -f "${_csr}" || \
+  certtool --generate-request \
+           --load-privkey="${_key}" \
+           --outfile="${_csr}"
+
+  printf "\n\n%s created\n" "${_csr}"
+
+# We post the CSR to the CACert form
+# Cookies are important to link this request with the next one
+  curl --cert "${_ccrt}" \
+       --key "${_key}" \
+       --cookie cookies \
+       --cookie-jar cookies \
+       --data "process=Submit" \
+       --data "oldid=10" \
+# Get the CSR from the file discarding the rest (it doesn't matter
+# anyway)
+       --data-urlencode "CSR=$(sed -n "/^-\+BEGIN NEW CERTIFICATE REQUEST/,/^-\+END NEW CERTIFICATE REQUEST/p" \
+       "${_csr}")" | \
+# Check if everything's ok
+       grep -o "CommonName: [^<]\+" && \
+# Accept the certificate
+  curl --cert "${_ccrt}" \
+       --key "${_key}" \
+# Cookies are needed!
+       --cookie cookies \
+       --cookie-jar cookies \
+# Just in case
+       --referer https://secure.cacert.org/account.php \
+       --data "process=Submit" \
+       --data "oldid=11" \
+       https://secure.cacert.org/account.php | \
+# Extract the certificate from the response
+       sed -n "/^-\+BEGIN CERTIFICATE/,/^-\+END CERTIFICATE/p" >"${_crt}"
+
+done

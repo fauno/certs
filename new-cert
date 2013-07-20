@@ -29,6 +29,8 @@ privileges, skipped\n" "${_host}" | fmt -w $(tput cols)
   if test ! -f "${_ccrt}" ; then
     printf "You don't have a client certificate to login into CACert.
 Please generate one with \`new-client\`" | fmt -w $(tput cols)
+    continue
+  fi
 
 # Generate a request and save it as root@example.org.csr using the
 # matching key.

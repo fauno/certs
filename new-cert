@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# TODO there's no need to create wildcard or subdomain certificates
+# separately.
 set -e
 
 _exit() { rm cookies; }
@@ -43,33 +45,30 @@ Please generate one with \`new-client\`\n" | fmt -w $(tput cols)
 
 # We post the CSR to the CACert form
 # Cookies are important to link this request with the next one
+# Get the CSR from the file discarding the rest (it doesn't matter
+# anyway)
   curl --cert "${_ccrt}" \
        --key "${_key}" \
        --cookie cookies \
        --cookie-jar cookies \
        --data "process=Submit" \
        --data "oldid=10" \
-# Get the CSR from the file discarding the rest (it doesn't matter
-# anyway)
-       --data-urlencode "CSR=$(sed -n "/^-\+BEGIN NEW CERTIFICATE REQUEST/,/^-\+END NEW CERTIFICATE REQUEST/p" \
-       "${_csr}")" | \
+       --data-urlencode "CSR=$(sed -n "/^-\+BEGIN NEW CERTIFICATE REQUEST/,/^-\+END NEW CERTIFICATE REQUEST/p" "${_csr}")" \
+       https://secure.cacert.org/account.php | \
 # Check if everything's ok
        grep -o "CommonName: [^<]\+" && \
 # Accept the certificate
+# Cookies are needed!
   curl --cert "${_ccrt}" \
        --key "${_key}" \
-# Cookies are needed!
        --cookie cookies \
        --cookie-jar cookies \
-# Just in case
        --referer https://secure.cacert.org/account.php \
        --data "process=Submit" \
        --data "oldid=11" \
        https://secure.cacert.org/account.php | \
-# Extract the certificate from the response
-       sed -n "/^-\+BEGIN CERTIFICATE/,/^-\+END CERTIFICATE/p" \
-# Save it...
-       >"${_crt}" && \
+# Extract the certificate from the response and save it...
+       sed -n "/^-\+BEGIN CERTIFICATE/,/^-\+END CERTIFICATE/p" >"${_crt}" && \
 # Remove the CSR
        shred --remove "${_csr}"
 

@@ -28,7 +28,7 @@ privileges, skipped\n" "${_host}" | fmt -w $(tput cols)
 
   if test ! -f "${_ccrt}" ; then
     printf "You don't have a client certificate to login into CACert.
-Please generate one with \`new-client\`" | fmt -w $(tput cols)
+Please generate one with \`new-client\`\n" | fmt -w $(tput cols)
     continue
   fi
 
@@ -67,6 +67,10 @@ Please generate one with \`new-client\`" | fmt -w $(tput cols)
        --data "oldid=11" \
        https://secure.cacert.org/account.php | \
 # Extract the certificate from the response
-       sed -n "/^-\+BEGIN CERTIFICATE/,/^-\+END CERTIFICATE/p" >"${_crt}"
+       sed -n "/^-\+BEGIN CERTIFICATE/,/^-\+END CERTIFICATE/p" \
+# Save it...
+       >"${_crt}" && \
+# Remove the CSR
+       shred --remove "${_csr}"
 
 done

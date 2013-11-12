@@ -53,6 +53,7 @@ Please generate one with \`new-client\`\n" | fmt -w $(tput cols)
        --cookie-jar cookies \
        --data "process=Submit" \
        --data "oldid=10" \
+       --data "CCA=true" \
        --data-urlencode "CSR=$(sed -n "/^-\+BEGIN NEW CERTIFICATE REQUEST/,/^-\+END NEW CERTIFICATE REQUEST/p" "${_csr}")" \
        https://secure.cacert.org/account.php | \
 # Check if everything's ok
